@@ -5,8 +5,8 @@ import numpy as np
 model = keras.models.load_model('model.keras')
 model.summary()
 
-directory_predict = 'archive/tree-bark/validate'
-file = '/pine/0.jpg'
+directory_predict = 'archive/tree-bark/test'
+file = '/alder/0.jpg'
 image_height = 500
 image_width = 500
 image_size = (image_height, image_width)

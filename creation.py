@@ -6,26 +6,27 @@ import matplotlib.pyplot as plt
 
 directory_train = 'archive/tree-bark/train'
 directory_test = 'archive/tree-bark/test'
-directory_predict = 'archive/tree-bark/validate'
+directory_validate = 'archive/tree-bark/validate'
 image_height = 500
 image_width = 500
 image_size = (image_height, image_width)
-epochs = 5
+epochs = 50
+batch_size = 2
 
 ds = keras.preprocessing.image_dataset_from_directory(
     directory_train,
     labels='inferred',
-    batch_size=32,
+    batch_size=batch_size,
     image_size=image_size,
     shuffle=True,
     seed=1234,
     interpolation='bilinear',
     follow_links=False
 )
-ds_teste = keras.preprocessing.image_dataset_from_directory(
-    directory_train,
+ds_val = keras.preprocessing.image_dataset_from_directory(
+    directory_validate,
     labels='inferred',
-    batch_size=32,
+    batch_size=batch_size,
     image_size=image_size,
     shuffle=True,
     seed=1234,
@@ -34,11 +35,6 @@ ds_teste = keras.preprocessing.image_dataset_from_directory(
 )
 
 class_names = ds.class_names
-
-AUTOTUNE = tf.data.AUTOTUNE
-
-ds = ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
-ds_teste = ds_teste.cache().prefetch(buffer_size=AUTOTUNE)
 
 # plt.figure(figsize=(10, 10))
 # for images, labels in ds.take(1):
@@ -74,7 +70,7 @@ model = models.Sequential([
 
     
 model.compile(optimizer='adam',loss=losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
-history = model.fit(ds, epochs=epochs, validation_data=ds_teste)    
+history = model.fit(ds, epochs=epochs, validation_data=ds_val,batch_size=batch_size)    
 
 acc = history.history['accuracy']
 val_acc = history.history['val_accuracy']
@@ -97,12 +93,12 @@ epochs_range = range(epochs)
 # plt.legend(loc='upper right')
 # plt.title('Training and Validation Loss')
 # plt.show()
-test_loss, test_acc = model.evaluate(ds_teste, verbose=2)
+test_loss, test_acc = model.evaluate(ds_val, verbose=2)
 
 model.summary()
 model.save('model.keras')
 
-img = keras.utils.load_img(directory_predict + '/birch/1.jpg', target_size=(image_height,image_width))
+img = keras.utils.load_img(directory_test + '/birch/1.jpg', target_size=(image_height,image_width))
 img_array = keras.utils.img_to_array(img)
 img_array = tf.expand_dims(img_array, 0) # Create a batch
 predictions = model.predict(img_array)

@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 directory_train = 'archive/tree-bark/train'
 directory_test = 'archive/tree-bark/test'
 directory_validate = 'archive/tree-bark/validate'
-image_height = 500
-image_width = 500
+image_height = 800
+image_width = 800
 image_size = (image_height, image_width)
 epochs = 50
 batch_size = 2

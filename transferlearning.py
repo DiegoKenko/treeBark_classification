@@ -1,74 +1,76 @@
 import keras 
 import numpy as np
+import matplotlib.pyplot as plt
 
 directory_train = 'archive/tree-bark/train'
-directory_test = 'archive/tree-bark/test'
-directory_validate = 'archive/tree-bark/validate'
 image_height = 500
 image_width = 500
 image_size = (image_height, image_width)
 epochs = 5
 batch_size = 32
 
-ds = keras.preprocessing.image_dataset_from_directory(
+(train_ds,val_ds) = keras.preprocessing.image_dataset_from_directory(
     directory_train,
-    label_mode='categorical',
-    labels='inferred',
     batch_size=1,
-    color_mode='rgb',
     image_size=image_size,
-    shuffle=True,
-    seed=1234,
-    subset='training',
-    validation_split=0.2,
-)
-
-ds_val = keras.preprocessing.image_dataset_from_directory(
-    directory_validate,
-    labels='inferred',
+    subset='both',
     label_mode='categorical',
-    batch_size=1,
-    color_mode='rgb',
-    image_size=image_size,
-    shuffle=True,
-    subset='validation',
     validation_split=0.2,
-    seed=1234,
+    seed=12,
 )
+class_names = train_ds.class_names
 
-vgg_model = keras.applications.VGG16(
+base_model = keras.applications.ResNet50V2(
     include_top=False,
     weights='imagenet',
     input_shape=(image_height, image_width, 3),
-    pooling='avg'
+    classes=len(class_names),
 )
 
-# Freeze four convolution blocks
-for layer in vgg_model.layers[:15]:
-    layer.trainable = False
-    
-# Make sure you have frozen the correct layers
-for i, layer in enumerate(vgg_model.layers):
-    print(i, layer.name, layer.trainable)
+model = keras.Sequential()
+model.add(base_model) 
+#Adding the Dense layers along with activation and batch normalization
+model.add(keras.layers.Dense(1000, activation='relu'))
+model.add(keras.layers.BatchNormalization())
+model.add(keras.layers.Dropout(rate=0.5, seed=42))
+model.add(keras.layers.Flatten())
+model.add(keras.layers.Dense(500, activation='relu'))
+model.add(keras.layers.Dropout(rate=0.5, seed=42))
+model.add(keras.layers.Dense(len(class_names), activation='softmax'))
 
-vgg_model.summary()
+model.compile(
+    loss='categorical_crossentropy', 
+    optimizer= keras.optimizers.Adam(learning_rate=0.0005), 
+    metrics = ['accuracy']
+)
 
-x = vgg_model.output
-x = keras.layers.Flatten()(x) # Flatten dimensions to for use in FC layers
-x = keras.layers.Dense(512, activation='relu')(x)
-x = keras.layers.Dropout(0.5)(x) # Dropout layer to reduce overfitting
-x = keras.layers.Dense(256, activation='relu')(x)
-x = keras.layers.Dense(12, activation='softmax')(x) # Softmax for multiclass
+monitoring1 = 'val_accuracy'
+filepath="newModel.keras"
 
-transfer_model = keras.Model(inputs=vgg_model.input, outputs=x)
+# setting model checkpoint, earlystopping, reduce_lr
+checkpoint = keras.callbacks.ModelCheckpoint(filepath, monitor=monitoring1, verbose=0, save_best_only=True, mode='max')
+earlystop = keras.callbacks.EarlyStopping(monitor = monitoring1, min_delta = 0, patience = 4, verbose = 1,restore_best_weights = True)
+reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=monitoring1, factor=0.2, verbose = 1, patience=2, min_lr=0.000001)
+callbacks_list = [checkpoint, earlystop, reduce_lr]
 
-transfer_model.summary()
+# Setting meximum epochs
+epochs = 200
 
-lr_reduce = keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.6, patience=8, verbose=1, mode='max', min_lr=5e-5)
-checkpoint = keras.callbacks.ModelCheckpoint('vgg16_finetune.keras', monitor= 'val_accuracy', mode= 'max', save_best_only = True, verbose= 1)
-transfer_model.compile(loss="categorical_crossentropy", optimizer=keras.optimizers.Adam(learning_rate=5e-5), metrics=["accuracy"])
-history = transfer_model.fit(ds, batch_size = batch_size, epochs=epochs, validation_data=ds_val, callbacks=[lr_reduce,checkpoint])
+# training the model
+history1 = model.fit(train_ds, batch_size=256, epochs=epochs, verbose=1, validation_data=val_ds,shuffle=True, callbacks=callbacks_list)
 
-for layer in vgg_model.layers[:15]:
-    layer.trainable = False
-    
+plt.figure(0)
+plt.plot(history1.history['accuracy'], label='training accuracy')
+plt.plot(history1.history['val_accuracy'], label='val accuracy')
+plt.title('Accuracy')
+plt.xlabel('epochs')
+plt.ylabel('accuracy')
+plt.legend()
+
+plt.figure(1)
+plt.plot(history1.history['loss'], label='training loss')
+plt.plot(history1.history['val_loss'], label='val loss')
+plt.title('Loss')
+plt.xlabel('epochs')
+plt.ylabel('loss')
+plt.legend()

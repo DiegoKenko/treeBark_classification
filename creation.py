@@ -8,22 +8,18 @@ directory_train = 'archive/tree-bark/train'
 image_height = 800
 image_width = 800
 image_size = (image_height, image_width)
-epochs = 2
+epochs = 50
 batch_size = 2
 
 (train_ds,val_ds) = keras.preprocessing.image_dataset_from_directory(
     directory_train,
-    labels='inferred',
-    label_mode='categorical',
-    batch_size=batch_size,
+    batch_size=1,
     image_size=image_size,
-    shuffle=True,
     subset='both',
     validation_split=0.2,
     seed=12,
-    interpolation='bilinear',
-    follow_links=False
 )
+
 
 class_names = train_ds.class_names
 
@@ -38,7 +34,7 @@ class_names = train_ds.class_names
 
 data_augmentation = keras.Sequential(
   [
-    layers.RandomFlip("horizontal"),
+    layers.RandomFlip("horizontal", input_shape=(image_height, image_width, 3)),
     layers.RandomRotation(0.2),
     layers.RandomZoom(height_factor=(0.1,0.3),width_factor=(0.1,0.3)),
   ]
@@ -61,7 +57,7 @@ model = models.Sequential([
 
     
 model.compile(optimizer='adam',loss=losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
-history = model.fit(train_ds, epochs=epochs, validation_data=val_ds,batch_size=batch_size)    
+history = model.fit(train_ds, epochs=epochs,validation_data=val_ds,batch_size=batch_size,verbose=1)    
 
 acc = history.history['accuracy']
 val_acc = history.history['val_accuracy']

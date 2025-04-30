@@ -4,6 +4,7 @@ import keras
 from keras import layers, models, losses
 import matplotlib.pyplot as plt
 
+filepath = 'model.keras'
 directory_train = 'archive/tree-bark/train'
 image_height = 800
 image_width = 800
@@ -40,30 +41,35 @@ data_augmentation = keras.Sequential(
   ]
 )
 
-model = models.Sequential([
-    data_augmentation,
-    layers.Rescaling(1./255),
-    layers.Conv2D(16, 3, padding='same', activation='relu'),
-    layers.MaxPooling2D(),
-    layers.Conv2D(32, 3, padding='same', activation='relu'),
-    layers.MaxPooling2D(),
-    layers.Conv2D(64, 3, padding='same', activation='relu'),
-    layers.MaxPooling2D(),
-    layers.Dropout(0.2),
-    layers.Flatten(),
-    layers.Dense(128, activation='relu'),
-    layers.Dense(len(class_names), name="outputs")
-])
-
-    
+model = keras.models.Sequential()
+model.add(data_augmentation)
+model.add(layers.Conv2D(64, (3,3), strides=(1,1), padding='same', activation = 'relu', input_shape=(image_height,image_width,3)))
+model.add(layers.MaxPooling2D((2,2)))
+model.add(layers.Dropout(0.10))
+model.add(layers.Conv2D(32, (3,3), strides=(1,1), padding='same', activation = 'relu'))
+model.add(layers.MaxPooling2D((2,2)))
+model.add(layers.Dropout(0.1))
+model.add(layers.Flatten())
+model.add(layers.Dense(32, activation='relu'))
+model.add(layers.Dense(len(class_names), activation='softmax'))
 model.compile(optimizer='adam',loss=losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
-history = model.fit(train_ds, epochs=epochs,validation_data=val_ds,batch_size=batch_size,verbose=1)    
 
-acc = history.history['accuracy']
-val_acc = history.history['val_accuracy']
+checkpoint = keras.callbacks.ModelCheckpoint(filepath, monitor='loss', verbose=1, save_best_only=True, mode='min')
+callbacks_list = [checkpoint]
 
-loss = history.history['loss']
-val_loss = history.history['val_loss']
+
+new_model = keras.models.load_model(filepath)
+np.testing.assert_allclose(model.predict(train_ds),new_model.predict(train_ds))
+new_model.summary()
+
+checkpoint = keras.callbacks.ModelCheckpoint(filepath, monitor='loss', verbose=1, save_best_only=True, mode='min')
+callbacks_list = [checkpoint]
+new_model.fit(train_ds, epochs=5, batch_size=batch_size, callbacks=callbacks_list)
+acc = new_model.history['accuracy']
+val_acc = new_model.history['val_accuracy']
+
+loss = new_model.history['loss']
+val_loss = new_model.history['val_loss']
 
 epochs_range = range(epochs)
 
@@ -81,13 +87,3 @@ epochs_range = range(epochs)
 # plt.title('Training and Validation Loss')
 # plt.show()
 test_loss, test_acc = model.evaluate(train_ds, verbose=2)
-
-model.summary()
-model.save('model.keras')
-
-img = keras.utils.load_img(directory_train + '/birch/1.jpg', target_size=(image_height,image_width))
-img_array = keras.utils.img_to_array(img)
-img_array = tf.expand_dims(img_array, 0) # Create a batch
-predictions = model.predict(img_array)
-score = tf.nn.softmax(predictions[0])
-print("This image most likely belongs to {} with a {:.2f} percent confidence.".format(class_names[np.argmax(score)], 100 * np.max(score)))
